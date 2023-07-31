@@ -7,7 +7,7 @@ def ReadCsvToDataFrame(path: str, header: Union[int, None]) -> pd.DataFrame:
     raise f'Expect header to be either 0 (first row) or None (now header), had {header}'
 
   lines = 0
-  with open(path, 'r') as file:
+  with open(path, 'r', encoding='utf-8') as file:
     for _ in file:
       lines += 1
   expect_rows = lines if header is None else lines - 1
