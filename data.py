@@ -25,16 +25,20 @@ def ReadCsvToDataFrame(path: str, header: Union[int, None]) -> pd.DataFrame:
 
 
 def ProcessInput(url: str, text: str) -> str:
+  ''' Input mapper. Both training and validating should apply this input mapper on raw data. '''
   return url.lower() + ':' + text.lower()
 
 
 def ProcessDataFrame(labeled: pd.DataFrame) -> pd.DataFrame:
+  ''' Simple data preprocess on the dataframe, such as filling empty values. '''
   # Fill missing values.
   labeled[['url', 'text']] = labeled[['url', 'text']].fillna("")
   labeled['is_news'] = labeled['is_news'].fillna(0).astype(int)
+  return labeled
 
 
 def FormDataset(labeled: pd.DataFrame) -> TensorDataset:
+  ''' Generates a tensor dataset for training. '''
   # Form inputs and labels for training.
   inputs = labeled.apply(
       lambda row: ProcessInput(url=row['url'], text=row['text']),
