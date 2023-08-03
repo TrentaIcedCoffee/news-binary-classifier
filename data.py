@@ -19,10 +19,3 @@ def ReadCsvToDataFrame(path: str, header: Union[int, None]) -> pd.DataFrame:
         f'Raw data has {expect_rows} rows from {lines} lines, found errors in {expect_rows-df.shape[0]} rows when loading to data frame'
     )
   return df
-
-
-def LoadLabeledData() -> pd.DataFrame:
-  labeled = ReadCsvToDataFrame('./labeled.csv', header=0)[:700]
-  labeled[['url', 'text']] = labeled[['url', 'text']].fillna("")
-  labeled['is_news'] = labeled['is_news'].fillna(0).astype(int)
-  return labeled
