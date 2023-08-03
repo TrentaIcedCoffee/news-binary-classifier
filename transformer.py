@@ -1,55 +1,14 @@
 from data import ReadCsvToDataFrame
 
-from typing import Tuple
-import pandas as pd
 import torch
+from data import ProcessInput, ProcessDataFrame, FormDataset, SplitDataset
 from datetime import datetime
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
-from torch.utils.data import DataLoader, TensorDataset, random_split
+from sklearn.metrics import classification_report
 
 
-def ProcessDataset(labeled: pd.DataFrame):
-  # Fill missing values.
-  labeled[['url', 'text']] = labeled[['url', 'text']].fillna("")
-  labeled['is_news'] = labeled['is_news'].fillna(0).astype(int)
-
-  # Form inputs and labels for training.
-  inputs = (labeled['url'] + ' ' + labeled['text'].str.lower()).to_list()
-  labels = labeled['is_news'].to_list()
-
-  # Word embedding using a pre-trained BERT tokenizer.
-  tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-  encoded_input = tokenizer(inputs,
-                            padding=True,
-                            truncation=True,
-                            return_tensors='pt')
-  labels = torch.tensor(labels)
-
-  dataset = TensorDataset(encoded_input['input_ids'],
-                          encoded_input['attention_mask'], labels)
-
-  print(f'Processed a dataset of size {len(dataset)}')
-
-  return dataset
-
-
-def SplitDataset(dataset: TensorDataset) -> Tuple[DataLoader, DataLoader]:
-  split_ratio = 0.8
-  training_dataset_size = int(len(dataset) * split_ratio)
-  val_dataset_size = len(dataset) - training_dataset_size
-
-  train_dataset, val_dataset = random_split(
-      dataset, [training_dataset_size, val_dataset_size])
-
-  print(
-      f'Splited dataset of size {len(dataset)} into {len(train_dataset)} training and {len(val_dataset)} validation.'
-  )
-
-  return DataLoader(train_dataset, batch_size=16,
-                    shuffle=True), DataLoader(val_dataset, batch_size=16)
-
-
-def TrainOn(labeled_data_path: str, epochs: int, debug: bool = False) -> None:
+def TrainOn(labeled_data_path: str, epochs: int, debug: bool = False) -> str:
+  ''' Train a transformer classifier and returns the trained model path. '''
   # Load a pre-trained BERT model for sequence classification (binary)
   model = BertForSequenceClassification.from_pretrained('bert-base-uncased',
                                                         num_labels=2)
@@ -57,7 +16,8 @@ def TrainOn(labeled_data_path: str, epochs: int, debug: bool = False) -> None:
   optimizer = AdamW(model.parameters(), lr=1e-5)
 
   training_dataset, val_dataset = SplitDataset(
-      ProcessDataset(ReadCsvToDataFrame(labeled_data_path, header=0)))
+      FormDataset(
+          ProcessDataFrame(ReadCsvToDataFrame(labeled_data_path, header=0))))
 
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   print(f'Training model on {device.type}')
@@ -124,6 +84,46 @@ def TrainOn(labeled_data_path: str, epochs: int, debug: bool = False) -> None:
   print(f'Saving trained model to {model_path}')
   torch.save(model.state_dict(), model_path)
 
+  return model_path
+
+
+class NewsBinaryClassifier:
+
+  def __init__(self, model_path: str):
+    self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    self.model = BertForSequenceClassification.from_pretrained(
+        'bert-base-uncased', num_labels=2)
+    self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+
+  def Predict(self, url: str, text: str) -> int:
+    ''' Returns the predicted class for the `text`. 1 for is news, 0 for not news. '''
+    #TODO: Multi texts input.
+    input = self.tokenizer(ProcessInput(url=url, text=text),
+                           padding=True,
+                           truncation=True,
+                           return_tensors='pt')
+
+    with torch.no_grad():
+      self.model.eval()
+      outputs = self.model(input['input_ids'],
+                           attention_mask=input['attention_mask'])
+      logits = outputs.logits
+      probabilities = torch.softmax(logits, dim=1)
+      predicted_class = torch.argmax(probabilities, dim=1).item()
+
+    return predicted_class
+
+  def ValidateOn(self, labeled_data_path: str):
+    labeled = ReadCsvToDataFrame(labeled_data_path, header=0)
+    labeled[['url', 'text']] = labeled[['url', 'text']].fillna("")
+    labeled['is_news'] = labeled['is_news'].fillna(0).astype(int)
+    labeled['prediction'] = labeled.apply(lambda row: self.Predict(
+        ProcessInput(url=row['url'], text=row['text'])),
+                                          axis='columns')
+    print(classification_report(labeled['is_news'], labeled['prediction']))
+
 
 if __name__ == "__main__":
-  TrainOn('./labeled.csv', 50, debug=True)
+  model_path = TrainOn('./labeled.csv', 50, debug=True)
+  NewsBinaryClassifier(model_path).ValidateOn('./labeled.csv')
