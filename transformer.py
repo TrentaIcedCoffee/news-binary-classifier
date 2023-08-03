@@ -1,7 +1,7 @@
 from data import ReadCsvToDataFrame
 
 import torch
-from data import ProcessInput, ProcessDataFrame, FormDataset, SplitDataset
+from data import ProcessInput, FillMissingValues, FormDataset, SplitDataset
 from datetime import datetime
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 from sklearn.metrics import classification_report
@@ -17,7 +17,7 @@ def TrainOn(labeled_data_path: str, epochs: int, debug: bool = False) -> str:
 
   training_dataset, val_dataset = SplitDataset(
       FormDataset(
-          ProcessDataFrame(ReadCsvToDataFrame(labeled_data_path, header=0))))
+          FillMissingValues(ReadCsvToDataFrame(labeled_data_path, header=0))))
 
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   print(f'Training model on {device.type}')
@@ -115,13 +115,13 @@ class NewsBinaryClassifier:
     return predicted_class
 
   def ValidateOn(self, labeled_data_path: str):
-    labeled = ReadCsvToDataFrame(labeled_data_path, header=0)
-    labeled[['url', 'text']] = labeled[['url', 'text']].fillna("")
-    labeled['is_news'] = labeled['is_news'].fillna(0).astype(int)
-    labeled['prediction'] = labeled.apply(lambda row: self.Predict(
-        ProcessInput(url=row['url'], text=row['text'])),
-                                          axis='columns')
-    print(classification_report(labeled['is_news'], labeled['prediction']))
+    labeled = FillMissingValues(ReadCsvToDataFrame(labeled_data_path, header=0))
+    labeled['prediction'] = labeled.apply(
+        lambda row: self.Predict(url=row['url'], text=row['text']),
+        axis='columns')
+    print(
+        classification_report(y_true=labeled['is_news'],
+                              y_pred=labeled['prediction']))
 
 
 if __name__ == "__main__":

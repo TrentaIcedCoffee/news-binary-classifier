@@ -29,9 +29,7 @@ def ProcessInput(url: str, text: str) -> str:
   return url.lower() + ':' + text.lower()
 
 
-def ProcessDataFrame(labeled: pd.DataFrame) -> pd.DataFrame:
-  ''' Simple data preprocess on the dataframe, such as filling empty values. '''
-  # Fill missing values.
+def FillMissingValues(labeled: pd.DataFrame) -> pd.DataFrame:
   labeled[['url', 'text']] = labeled[['url', 'text']].fillna("")
   labeled['is_news'] = labeled['is_news'].fillna(0).astype(int)
   return labeled
