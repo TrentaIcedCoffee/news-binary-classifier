@@ -1,30 +1,29 @@
-from data import ReadCsvToDataFrame
-
 import torch
-from data import ProcessInput, FillMissingValues, FormDataset, SplitDataset
-from datetime import datetime
-from transformers import BertTokenizer, BertForSequenceClassification, AdamW
-from sklearn.metrics import classification_report
+import data
+import datetime
+import torch.utils.data as torch_data
+import transformers
+import sklearn.metrics as metrics
 
 
-def TrainOn(labeled_data_path: str, epochs: int, debug: bool = False) -> str:
+def TrainOn(dataset: torch_data.TensorDataset,
+            epochs: int,
+            debug: bool = False) -> str:
   ''' Train a transformer classifier and returns the trained model path. '''
   # Load a pre-trained BERT model for sequence classification (binary)
-  model = BertForSequenceClassification.from_pretrained('bert-base-uncased',
-                                                        num_labels=2)
+  model = transformers.BertForSequenceClassification.from_pretrained(
+      'bert-base-uncased', num_labels=2)
   # Fine-tune using Adam, with Weight Deday (L2 regularization) to prevent overfitting.
-  optimizer = AdamW(model.parameters(), lr=1e-5)
+  optimizer = transformers.AdamW(model.parameters(), lr=1e-5)
 
-  training_dataset, val_dataset = SplitDataset(
-      FormDataset(
-          FillMissingValues(ReadCsvToDataFrame(labeled_data_path, header=0))))
+  training_dataset, val_dataset = data.SplitDataset(dataset)
 
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   print(f'Training model on {device.type}')
   model.to(device)
 
   if debug:
-    print(f'Training model with debug mode')
+    print(f'Training model with DEBUG mode')
   for epoch in range(1 if debug else epochs):
     model.train()
     total_loss = 0
@@ -80,7 +79,7 @@ def TrainOn(labeled_data_path: str, epochs: int, debug: bool = False) -> str:
         f"Epoch {epoch + 1}/{epochs}, Avg. Training Loss: {avg_train_loss}, Validation Accuracy: {avg_val_accuracy}"
     )
 
-  model_path = f'./model_{datetime.now().strftime("%H_%M_%S")}.pth'
+  model_path = f'./model_{datetime.datetime.now().strftime("%H_%M_%S")}.pth'
   print(f'Saving trained model to {model_path}')
   torch.save(model.state_dict(), model_path)
 
@@ -91,15 +90,16 @@ class NewsBinaryClassifier:
 
   def __init__(self, model_path: str):
     self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    self.model = BertForSequenceClassification.from_pretrained(
+    self.tokenizer = transformers.BertTokenizer.from_pretrained(
+        'bert-base-uncased')
+    self.model = transformers.BertForSequenceClassification.from_pretrained(
         'bert-base-uncased', num_labels=2)
     self.model.load_state_dict(torch.load(model_path, map_location=self.device))
 
-  def Predict(self, url: str, text: str) -> int:
+  def Predict(self, url: str) -> int:
     ''' Returns the predicted class for the `text`. 1 for is news, 0 for not news. '''
     #TODO: Multi texts input.
-    input = self.tokenizer(ProcessInput(url=url, text=text),
+    input = self.tokenizer(data.ProcessInput(url=url),
                            padding=True,
                            truncation=True,
                            return_tensors='pt')
@@ -114,16 +114,15 @@ class NewsBinaryClassifier:
 
     return predicted_class
 
-  def ValidateOn(self, labeled_data_path: str):
-    labeled = FillMissingValues(ReadCsvToDataFrame(labeled_data_path, header=0))
-    labeled['prediction'] = labeled.apply(
-        lambda row: self.Predict(url=row['url'], text=row['text']),
-        axis='columns')
-    print(
-        classification_report(y_true=labeled['is_news'],
-                              y_pred=labeled['prediction']))
-
 
 if __name__ == "__main__":
-  model_path = TrainOn('./labeled.csv', 50, debug=True)
-  NewsBinaryClassifier(model_path).ValidateOn('./labeled.csv')
+  labeled = data.LoadLabeledData('./sample_0803_labeled.csv')
+
+  model_path = TrainOn(data.FormDataset(labeled), 50)
+  classifier = NewsBinaryClassifier(model_path)
+
+  labeled['prediction'] = labeled['url'].apply(classifier.Predict)
+  print(
+      metrics.classification_report(y_true=labeled['is_news'],
+                                    y_pred=labeled['prediction']))
+  labeled.to_csv('./verification.csv', index=False)
