@@ -1,3 +1,4 @@
+# Trains a transformer model of news binary classifier.
 # ./train.py --dataset=labeled.csv --debug=False
 
 import argparse
@@ -13,6 +14,8 @@ def main():
   parser.add_argument("--debug", type=bool, required=True, help="Debug run")
 
   args = parser.parse_args()
+  print(f'Train model with args ' +
+        ', '.join(f'{arg}:{getattr(args, arg)}' for arg in vars(args)))
 
   model_path = news_classifier.TrainOn(data_layer.FormDataset(
       data_layer.LoadLabeledData(args.dataset)),

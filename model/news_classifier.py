@@ -86,6 +86,8 @@ class NewsBinaryClassifier:
         'bert-base-uncased', num_labels=2)
     self.model.load_state_dict(torch.load(model_path, map_location=self.device))
 
+    print(f'Model running on {self.device}')
+
   def Predict(self, url: str) -> int:
     ''' Returns the predicted class for the `text`. 1 for is news, 0 for not news. '''
     #TODO: Multi texts input.
