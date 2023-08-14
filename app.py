@@ -3,7 +3,7 @@ from model import news_classifier
 
 app = flask.Flask(__name__)
 
-model = news_classifier.NewsBinaryClassifier('./model_00_02_17.pth')
+model = news_classifier.NewsBinaryClassifier('./model.pth')
 
 
 @app.route('/predict', methods=['POST'])
@@ -25,4 +25,5 @@ def is_alive():
 
 
 if __name__ == '__main__':
+  # Debug run on local, ignored by production.
   app.run(debug=True, host="0.0.0.0", port=8080)
