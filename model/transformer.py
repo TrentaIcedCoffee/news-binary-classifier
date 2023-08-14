@@ -26,7 +26,6 @@ def TrainOn(dataset: torch_data.TensorDataset,
     print(f'Training model with DEBUG mode')
   for epoch in range(1 if debug else epochs):
     model.train()
-    total_loss = 0
     for batch_idx, batch in enumerate(training_dataset):
       print(
           f'Training epoch {epoch+1}/{epochs}, batch {batch_idx+1}/{len(training_dataset)}'
@@ -46,17 +45,12 @@ def TrainOn(dataset: torch_data.TensorDataset,
       optimizer.step()
       optimizer.zero_grad()
 
-      total_loss += loss.item()
-
       if debug:
         break  # Train a single batch for debug.
 
-    avg_train_loss = total_loss / len(training_dataset)
-
     # Validation
     model.eval()
-    val_accuracy = 0
-    val_steps = 0
+    actual, prediction = [], []
 
     with torch.no_grad():
       for batch in val_dataset:
@@ -70,14 +64,10 @@ def TrainOn(dataset: torch_data.TensorDataset,
 
         # Calculate accuracy
         _, predicted_labels = torch.max(logits, 1)
-        val_accuracy += (predicted_labels == batch_labels).sum().item()
-        val_steps += len(batch_labels)
-
-    avg_val_accuracy = val_accuracy / val_steps
-
-    print(
-        f"Epoch {epoch + 1}/{epochs}, Avg. Training Loss: {avg_train_loss}, Validation Accuracy: {avg_val_accuracy}"
-    )
+        actual.extend(batch_labels.cpu().numpy())
+        prediction.extend(predicted_labels.cpu().numpy())
+    print(f"Epoch {epoch + 1}/{epochs}")
+    print(metrics.classification_report(y_true=actual, y_pred=prediction))
 
   model_path = f'./model_{datetime.datetime.now().strftime("%H_%M_%S")}.pth'
   print(f'Saving trained model to {model_path}')
@@ -113,16 +103,3 @@ class NewsBinaryClassifier:
       predicted_class = torch.argmax(probabilities, dim=1).item()
 
     return predicted_class
-
-
-if __name__ == "__main__":
-  labeled = data.LoadLabeledData('./sample_0803_labeled.csv')
-
-  model_path = TrainOn(data.FormDataset(labeled), 50)
-  classifier = NewsBinaryClassifier(model_path)
-
-  labeled['prediction'] = labeled['url'].apply(classifier.Predict)
-  print(
-      metrics.classification_report(y_true=labeled['is_news'],
-                                    y_pred=labeled['prediction']))
-  labeled.to_csv('./verification.csv', index=False)
