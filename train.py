@@ -1,7 +1,7 @@
 # ./train.py --dataset=labeled.csv --debug=False
 
 import argparse
-from model import transformer, data
+from model import data_layer, news_classifier
 
 
 def main():
@@ -14,10 +14,10 @@ def main():
 
   args = parser.parse_args()
 
-  model_path = transformer.TrainOn(data.FormDataset(
-      data.LoadLabeledData(args.dataset)),
-                                   epochs=50,
-                                   debug=args.debug)
+  model_path = news_classifier.TrainOn(data_layer.FormDataset(
+      data_layer.LoadLabeledData(args.dataset)),
+                                       epochs=50,
+                                       debug=args.debug)
   print(f'Training finished with model saved in {model_path}')
 
 

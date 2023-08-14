@@ -1,5 +1,5 @@
 import torch
-from model import data
+from model import data_layer
 import datetime
 import torch.utils.data as torch_data
 import transformers
@@ -16,7 +16,7 @@ def TrainOn(dataset: torch_data.TensorDataset,
   # Fine-tune using Adam, with Weight Deday (L2 regularization) to prevent overfitting.
   optimizer = transformers.AdamW(model.parameters(), lr=1e-5)
 
-  training_dataset, val_dataset = data.SplitDataset(dataset)
+  training_dataset, val_dataset = data_layer.SplitDataset(dataset)
 
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   print(f'Training model on {device.type}')
@@ -89,7 +89,7 @@ class NewsBinaryClassifier:
   def Predict(self, url: str) -> int:
     ''' Returns the predicted class for the `text`. 1 for is news, 0 for not news. '''
     #TODO: Multi texts input.
-    input = self.tokenizer(data.ProcessInput(url=url),
+    input = self.tokenizer(data_layer.ProcessInput(url=url),
                            padding=True,
                            truncation=True,
                            return_tensors='pt')

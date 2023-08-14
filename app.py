@@ -1,5 +1,5 @@
 import flask
-from model import transformer as news_classifier
+from model import news_classifier
 
 app = flask.Flask(__name__)
 
