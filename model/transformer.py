@@ -1,5 +1,5 @@
 import torch
-import data
+from model import data
 import datetime
 import torch.utils.data as torch_data
 import transformers
