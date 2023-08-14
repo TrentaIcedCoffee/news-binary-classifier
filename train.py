@@ -5,13 +5,24 @@ import argparse
 from model import data_layer, news_classifier
 
 
+def str_to_bool(value) -> bool:
+  if isinstance(value, bool):
+    return value
+  elif isinstance(value, str) and value.lower() in ("true"):
+    return True
+  elif isinstance(value, str) and value.lower() in ("false"):
+    return False
+  else:
+    raise argparse.ArgumentTypeError("Boolean literal expected.")
+
+
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument("--dataset",
                       type=str,
                       required=True,
                       help="Dataset in csv format")
-  parser.add_argument("--debug", type=bool, required=True, help="Debug run")
+  parser.add_argument("--debug", type=str_to_bool, required=True, help="Debug run")
 
   args = parser.parse_args()
   print(f'Train model with args ' +
