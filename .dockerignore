@@ -1,8 +1,11 @@
-__pycache__/
+**/__pycache__
 venv/
 .DS_Store
 
 *.csv
+*.jpg
+README.md
+train.py
 
 .style.yapf
 .gitignore
