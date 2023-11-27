@@ -4,3 +4,5 @@ venv/
 
 *.csv
 *.pth
+*key.json
+cred.sh
