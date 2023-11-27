@@ -6,3 +6,5 @@ venv/
 *.pth
 *key.json
 cred.sh
+deploy.sh
+Dockerfile
