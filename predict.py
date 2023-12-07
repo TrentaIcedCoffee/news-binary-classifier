@@ -7,10 +7,10 @@ from absl import app
 from absl import flags
 from model import news_classifier
 import pandas as pd
-import csv
 import logging
 from google.cloud import storage
 import tempfile
+import tqdm
 
 _DATA_URL = flags.DEFINE_string("data_url", '',
                                 'Data CSV Google Cloud Storage URL.')
@@ -61,20 +61,22 @@ def main(_):
       _load_checkpoint(_MODEL_URL.value))
 
   data = pd.read_csv(download_from_gcs(_DATA_URL.value), header=0)
+  data.dropna(inplace=True)
 
   if _DRY_RUN.value:
     data = data[:100]
 
+  tqdm.tqdm.pandas()
+  data['is_news'] = data['Url'].progress_apply(
+      lambda url: bool(model.Predict(url)))
+
+  news = data[data['is_news']].copy().reset_index(drop=True)
+  news.dropna(inplace=True)
+  logging.info(f'Found {len(news)} news from {len(data)} rows.')
+
   with tempfile.NamedTemporaryFile(delete=False, mode='w',
                                    encoding='utf-8') as f:
-    csv_writer = csv.writer(f)
-    csv_writer.writerow(data.columns.to_list() + ['is_news'])
-    for index, row in data.iterrows():
-      row['is_news'] = bool(model.Predict(row['Url']))
-      csv_writer.writerow(row.to_list())
-
-      if index % 100 == 0 or index == len(data) - 1:
-        logging.info(f'Process {index+1} / {len(data)}')
+    news.to_csv(f, header=True, index=False)
 
   upload_to_gcs('/'.join(_DATA_URL.value.split('/')[:-1] + ['news.csv']),
                 f.name)
